@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/mohamadkaifshaik/dzeroth/internal/database"
 	"github.com/mohamadkaifshaik/dzeroth/internal/innercircle"
+	"github.com/mohamadkaifshaik/dzeroth/internal/posts"
 	"github.com/mohamadkaifshaik/dzeroth/internal/users"
 )
 
@@ -37,8 +38,8 @@ func main() {
 	innerCircleHandler := innercircle.NewHandler(innerCircleRepository)
 
 	http.HandleFunc(
-	"/api/v1/inner-circle",
-	innerCircleHandler.GetMembers,
+		"/api/v1/inner-circle",
+		innerCircleHandler.GetMembers,
 	)
 
 	http.HandleFunc(
@@ -58,6 +59,42 @@ func main() {
 					http.StatusMethodNotAllowed,
 				)
 			}
+		},
+	)
+
+	// Initialize the post repository and handler
+	postRepository := posts.NewRepository(databasePool)
+	postHandler := posts.NewHandler(postRepository)
+
+	http.HandleFunc(
+		"/api/v1/posts",
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				postHandler.CreatePost(w, r)
+				return
+			}
+
+			http.Error(
+				w,
+				"method not allowed",
+				http.StatusMethodNotAllowed,
+			)
+		},
+	)
+
+	http.HandleFunc(
+		"/api/v1/feeds/inner-circle",
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodGet {
+				postHandler.GetInnerCircleFeed(w, r)
+				return
+			}
+
+			http.Error(
+				w,
+				"method not allowed",
+				http.StatusMethodNotAllowed,
+			)
 		},
 	)
 
