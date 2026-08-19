@@ -163,5 +163,5 @@ func NewRouter(databasePool *pgxpool.Pool) http.Handler {
 		},
 	)
 
-	return mux
+	return withCORS(mux)
 }
