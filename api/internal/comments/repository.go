@@ -27,7 +27,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-func (repo *Repository) userCanAccessPost(
+func (repo *Repository) canAccessPost(
 	ctx context.Context,
 	userID string,
 	postID string,
@@ -43,19 +43,17 @@ func (repo *Repository) userCanAccessPost(
 			WHERE p.id = $1
 			  AND p.status = 'active'
 			  AND (
-					p.author_id = $2
-					OR
-					p.visibility = 'public'
-					OR
-					(
-						p.visibility = 'inner_circle'
-						AND EXISTS (
-							SELECT 1
-							FROM inner_circle_members ic
-							WHERE ic.user_id = $2
-							  AND ic.member_id = p.author_id
-						)
+				p.author_id = $2
+				OR p.visibility = 'public'
+				OR (
+					p.visibility = 'inner_circle'
+					AND EXISTS (
+						SELECT 1
+						FROM inner_circle_members ic
+						WHERE ic.user_id = $2
+						  AND ic.member_id = p.author_id
 					)
+				)
 			  )
 		)
 		`,
@@ -76,7 +74,7 @@ func (repo *Repository) Create(
 		return nil, fmt.Errorf("comment cannot be empty")
 	}
 
-	allowed, err := repo.userCanAccessPost(ctx, userID, postID)
+	allowed, err := repo.canAccessPost(ctx, userID, postID)
 
 	if err != nil {
 		return nil, err
@@ -129,7 +127,7 @@ func (repo *Repository) GetForPost(
 	userID string,
 	postID string,
 ) ([]Comment, error) {
-	allowed, err := repo.userCanAccessPost(ctx, userID, postID)
+	allowed, err := repo.canAccessPost(ctx, userID, postID)
 
 	if err != nil {
 		return nil, err
@@ -190,5 +188,9 @@ func (repo *Repository) GetForPost(
 		result = append(result, comment)
 	}
 
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

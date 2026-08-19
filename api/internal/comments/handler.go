@@ -27,19 +27,22 @@ func (handler *Handler) CreateComment(
 	userID := r.Header.Get("X-User-ID")
 
 	if userID == "" {
-		http.Error(w, "X-User-ID header is required", http.StatusUnauthorized)
+		http.Error(
+			w,
+			"X-User-ID header is required",
+			http.StatusUnauthorized,
+		)
 		return
 	}
 
-	postID := strings.TrimPrefix(
-		r.URL.Path,
-		"/api/v1/posts/",
-	)
-
-	postID = strings.TrimSuffix(postID, "/comments")
+	postID := extractPostID(r.URL.Path)
 
 	if postID == "" {
-		http.Error(w, "post ID is required", http.StatusBadRequest)
+		http.Error(
+			w,
+			"post ID is required",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
@@ -48,7 +51,11 @@ func (handler *Handler) CreateComment(
 	err := json.NewDecoder(r.Body).Decode(&request)
 
 	if err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		http.Error(
+			w,
+			"invalid request body",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
@@ -62,21 +69,29 @@ func (handler *Handler) CreateComment(
 	)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "cannot access") {
-			http.Error(w, err.Error(), http.StatusForbidden)
-			return
+		switch err.Error() {
+		case "comment cannot be empty":
+			http.Error(
+				w,
+				err.Error(),
+				http.StatusBadRequest,
+			)
+
+		case "you cannot access this post":
+			http.Error(
+				w,
+				err.Error(),
+				http.StatusForbidden,
+			)
+
+		default:
+			http.Error(
+				w,
+				"failed to create comment",
+				http.StatusInternalServerError,
+			)
 		}
 
-		if strings.Contains(err.Error(), "cannot be empty") {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		http.Error(
-			w,
-			"failed to create comment",
-			http.StatusInternalServerError,
-		)
 		return
 	}
 
@@ -93,16 +108,24 @@ func (handler *Handler) GetComments(
 	userID := r.Header.Get("X-User-ID")
 
 	if userID == "" {
-		http.Error(w, "X-User-ID header is required", http.StatusUnauthorized)
+		http.Error(
+			w,
+			"X-User-ID header is required",
+			http.StatusUnauthorized,
+		)
 		return
 	}
 
-	postID := strings.TrimPrefix(
-		r.URL.Path,
-		"/api/v1/posts/",
-	)
+	postID := extractPostID(r.URL.Path)
 
-	postID = strings.TrimSuffix(postID, "/comments")
+	if postID == "" {
+		http.Error(
+			w,
+			"post ID is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
 
 	comments, err := handler.repository.GetForPost(
 		r.Context(),
@@ -111,8 +134,12 @@ func (handler *Handler) GetComments(
 	)
 
 	if err != nil {
-		if strings.Contains(err.Error(), "cannot access") {
-			http.Error(w, err.Error(), http.StatusForbidden)
+		if err.Error() == "you cannot access this post" {
+			http.Error(
+				w,
+				err.Error(),
+				http.StatusForbidden,
+			)
 			return
 		}
 
@@ -130,4 +157,17 @@ func (handler *Handler) GetComments(
 		"comments": comments,
 		"count":    len(comments),
 	})
+}
+
+func extractPostID(path string) string {
+	const prefix = "/api/v1/posts/"
+
+	if !strings.HasPrefix(path, prefix) {
+		return ""
+	}
+
+	postID := strings.TrimPrefix(path, prefix)
+	postID = strings.TrimSuffix(postID, "/comments")
+
+	return strings.TrimSpace(postID)
 }
