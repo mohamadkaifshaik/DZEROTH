@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"github.com/mohamadkaifshaik/dzeroth/internal/comments"
+	"github.com/mohamadkaifshaik/dzeroth/internal/discovery"
 	"github.com/mohamadkaifshaik/dzeroth/internal/innercircle"
+	"github.com/mohamadkaifshaik/dzeroth/internal/interests"
 	"github.com/mohamadkaifshaik/dzeroth/internal/posts"
 	"github.com/mohamadkaifshaik/dzeroth/internal/reactions"
 	"github.com/mohamadkaifshaik/dzeroth/internal/users"
@@ -160,6 +162,82 @@ func NewRouter(databasePool *pgxpool.Pool) http.Handler {
 			default:
 				http.NotFound(w, r)
 			}
+		},
+	)
+
+	// Interests
+	interestRepository := interests.NewRepository(databasePool)
+	interestHandler := interests.NewHandler(interestRepository)
+
+	mux.HandleFunc(
+		"/api/v1/interests",
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet {
+				http.Error(
+					w,
+					"method not allowed",
+					http.StatusMethodNotAllowed,
+				)
+				return
+			}
+
+			interestHandler.GetAll(w, r)
+		},
+	)
+
+	mux.HandleFunc(
+		"/api/v1/me/interests",
+		func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodGet:
+				interestHandler.GetMine(w, r)
+
+			case http.MethodPost:
+				interestHandler.Add(w, r)
+
+			default:
+				http.Error(
+					w,
+					"method not allowed",
+					http.StatusMethodNotAllowed,
+				)
+			}
+		},
+	)
+
+	mux.HandleFunc(
+		"/api/v1/me/interests/",
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodDelete {
+				http.Error(
+					w,
+					"method not allowed",
+					http.StatusMethodNotAllowed,
+				)
+				return
+			}
+
+			interestHandler.Remove(w, r)
+		},
+	)
+
+	// Discovery
+	discoveryRepository := discovery.NewRepository(databasePool)
+	discoveryHandler := discovery.NewHandler(discoveryRepository)
+
+	mux.HandleFunc(
+		"/api/v1/feeds/discovery",
+		func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet {
+				http.Error(
+					w,
+					"method not allowed",
+					http.StatusMethodNotAllowed,
+				)
+				return
+			}
+
+			discoveryHandler.GetFeed(w, r)
 		},
 	)
 

@@ -12,8 +12,9 @@ type Handler struct {
 }
 
 type CreatePostRequest struct {
-	Content    string `json:"content"`
-	Visibility string `json:"visibility"`
+	Content     string   `json:"content"`
+	Visibility  string   `json:"visibility"`
+	InterestIDs []string `json:"interest_ids"`
 }
 
 func NewHandler(repository *Repository) *Handler {
@@ -57,6 +58,7 @@ func (handler *Handler) CreatePost(
 		userID,
 		request.Content,
 		request.Visibility,
+		request.InterestIDs,
 	)
 
 	if err != nil {

@@ -32,8 +32,8 @@ func (repo *Repository) Create(
 	authorID string,
 	content string,
 	visibility string,
+	interestIDs []string,
 ) (*Post, error) {
-
 	if content == "" {
 		return nil, fmt.Errorf("post content cannot be empty")
 	}
@@ -42,9 +42,22 @@ func (repo *Repository) Create(
 		return nil, fmt.Errorf("invalid post visibility")
 	}
 
+	// Inner Circle posts don't need interests.
+	if visibility == "inner_circle" {
+		interestIDs = nil
+	}
+
+	tx, err := repo.db.Begin(ctx)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback(ctx)
+
 	post := &Post{}
 
-	err := repo.db.QueryRow(
+	err = tx.QueryRow(
 		ctx,
 		`
 		INSERT INTO posts (
@@ -75,6 +88,31 @@ func (repo *Repository) Create(
 		return nil, err
 	}
 
+	for _, interestID := range interestIDs {
+		_, err = tx.Exec(
+			ctx,
+			`
+			INSERT INTO post_interests (
+				post_id,
+				interest_id
+			)
+			VALUES ($1, $2)
+			ON CONFLICT (post_id, interest_id)
+			DO NOTHING
+			`,
+			post.ID,
+			interestID,
+		)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
 	return post, nil
 }
 
@@ -82,7 +120,6 @@ func (repo *Repository) GetInnerCircleFeed(
 	ctx context.Context,
 	userID string,
 ) ([]Post, error) {
-
 	rows, err := repo.db.Query(
 		ctx,
 		`
@@ -151,4 +188,33 @@ func (repo *Repository) GetInnerCircleFeed(
 	}
 
 	return feed, nil
+}
+
+func (repo *Repository) AddInterests(
+	ctx context.Context,
+	postID string,
+	interestIDs []string,
+) error {
+	for _, interestID := range interestIDs {
+		_, err := repo.db.Exec(
+			ctx,
+			`
+			INSERT INTO post_interests (
+				post_id,
+				interest_id
+			)
+			VALUES ($1, $2)
+			ON CONFLICT (post_id, interest_id)
+			DO NOTHING
+			`,
+			postID,
+			interestID,
+		)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
