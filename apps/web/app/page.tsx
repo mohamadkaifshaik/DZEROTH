@@ -17,6 +17,7 @@ import {
   getMyInterests,
   removeInterest,
 } from "../lib/api";
+import { supabase } from "@/lib/supabase";
 
 type User = {
   id: string;
@@ -86,6 +87,19 @@ export default function Home() {
   const [showInterestPicker, setShowInterestPicker] = useState(false);
 
   const [loadingInterests, setLoadingInterests] = useState(false);
+
+  useEffect(() => {
+    async function checkSupabaseUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      console.log("Supabase ID:", user?.id);
+      console.log("Supabase email:", user?.email);
+    }
+
+    checkSupabaseUser();
+  }, []);
 
   async function loadPage() {
     try {
@@ -410,7 +424,7 @@ export default function Home() {
 
             <div className="circle-count">
               <span>●</span>
-              {posts.length} updates
+              {posts.length} {space === "inner_circle" ? "updates" : "posts"}
             </div>
           </div>
 
@@ -600,11 +614,34 @@ export default function Home() {
 
           {posts.length === 0 && (
             <div className="empty">
-              <div className="empty-icon">○</div>
+              <div className="empty-icon">
+                {space === "inner_circle" ? "○" : "✦"}
+              </div>
 
-              <h3>Your circle is quiet.</h3>
+              <h3>
+                {space === "inner_circle"
+                  ? "Your circle is quiet."
+                  : myInterestIds.length === 0
+                    ? "Choose what you want to discover."
+                    : "Nothing new right now."}
+              </h3>
 
-              <p>When your people share something, it'll appear here.</p>
+              <p>
+                {space === "inner_circle"
+                  ? "When your people share something, it'll appear here."
+                  : myInterestIds.length === 0
+                    ? "Discovery only shows topics you intentionally choose."
+                    : "You've seen everything matching your interests for now."}
+              </p>
+
+              {space === "discovery" && myInterestIds.length === 0 && (
+                <button
+                  className="interest-done"
+                  onClick={() => setShowInterestPicker(true)}
+                >
+                  Choose interests
+                </button>
+              )}
             </div>
           )}
         </section>

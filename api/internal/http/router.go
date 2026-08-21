@@ -4,11 +4,13 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/mohamadkaifshaik/dzeroth/internal/auth"
 	"github.com/mohamadkaifshaik/dzeroth/internal/comments"
 	"github.com/mohamadkaifshaik/dzeroth/internal/discovery"
 	"github.com/mohamadkaifshaik/dzeroth/internal/innercircle"
 	"github.com/mohamadkaifshaik/dzeroth/internal/interests"
 	"github.com/mohamadkaifshaik/dzeroth/internal/posts"
+	"github.com/mohamadkaifshaik/dzeroth/internal/provisioning"
 	"github.com/mohamadkaifshaik/dzeroth/internal/reactions"
 	"github.com/mohamadkaifshaik/dzeroth/internal/users"
 
@@ -17,10 +19,20 @@ import (
 
 func NewRouter(databasePool *pgxpool.Pool) http.Handler {
 	mux := http.NewServeMux()
+	authMiddleware, err := auth.NewMiddleware()
+
+	if err != nil {
+		panic(err)
+	}
 
 	// Users
 	userRepository := users.NewRepository(databasePool)
 	userHandler := users.NewHandler(userRepository)
+
+	provisioningMiddleware :=
+		provisioning.NewMiddleware(
+			userRepository,
+		)
 
 	mux.HandleFunc(
 		"/api/v1/me",
@@ -241,5 +253,15 @@ func NewRouter(databasePool *pgxpool.Pool) http.Handler {
 		},
 	)
 
-	return withCORS(mux)
+	provisionedRouter :=
+		provisioningMiddleware.EnsureUser(
+			mux,
+		)
+
+	protectedRouter :=
+		authMiddleware.RequireAuth(
+			provisionedRouter,
+		)
+
+	return withCORS(protectedRouter)
 }

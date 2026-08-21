@@ -1,25 +1,44 @@
-const API_URL = "http://localhost:8080";
+import { supabase } from "./supabase";
 
-const USER_ID = "bf5520a6-0bfe-441a-8699-34515c4e51cc";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 async function request(path: string, options: RequestInit = {}) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  console.log("Supabase session user:", session?.user?.id ?? "NO SESSION");
+
+  const requestHeaders = new Headers();
+
+  requestHeaders.set("Content-Type", "application/json");
+
+  if (session?.access_token) {
+    requestHeaders.set("Authorization", `Bearer ${session.access_token}`);
+  }
+
+  if (options.headers) {
+    const extraHeaders = new Headers(options.headers);
+
+    extraHeaders.forEach((value, key) => {
+      requestHeaders.set(key, value);
+    });
+  }
+
+  console.log(
+    "Sending authorization:",
+    requestHeaders.get("Authorization") ? "YES" : "NO",
+  );
+
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-User-ID": USER_ID,
-      ...options.headers,
-    },
+    headers: requestHeaders,
   });
 
   if (!response.ok) {
     const message = await response.text();
 
-    throw new Error(message || `Request failed: ${response.status}`);
-  }
-
-  if (response.status === 204) {
-    return null;
+    throw new Error(message || "Request failed");
   }
 
   return response.json();

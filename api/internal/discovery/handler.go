@@ -3,6 +3,8 @@ package discovery
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/mohamadkaifshaik/dzeroth/internal/auth"
 )
 
 type Handler struct {
@@ -19,12 +21,14 @@ func (handler *Handler) GetFeed(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	userID := r.Header.Get("X-User-ID")
+	userID, ok := auth.UserID(
+		r.Context(),
+	)
 
-	if userID == "" {
+	if !ok {
 		http.Error(
 			w,
-			"X-User-ID header is required",
+			"unauthorized",
 			http.StatusUnauthorized,
 		)
 		return

@@ -2,6 +2,7 @@ package users
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -111,4 +112,51 @@ func (repo *Repository) UpdateProfile(
 	}
 
 	return user, nil
+}
+
+func (repo *Repository) EnsureUser(
+	ctx context.Context,
+	userID string,
+	email string,
+) error {
+	if len(userID) < 8 {
+		return fmt.Errorf("invalid user ID: %s", userID)
+	}
+
+	username := "user_" + userID[:8]
+
+	_, err := repo.db.Exec(
+		ctx,
+		`
+		INSERT INTO users (
+			id,
+			email,
+			username,
+			display_name,
+			status
+		)
+		VALUES (
+			$1,
+			$2,
+			$3,
+			$4,
+			'active'
+		)
+		ON CONFLICT (id) DO NOTHING
+		`,
+		userID,
+		email,
+		username,
+		"New User",
+	)
+
+	if err != nil {
+		return fmt.Errorf(
+			"database insert failed for user %s: %w",
+			userID,
+			err,
+		)
+	}
+
+	return nil
 }

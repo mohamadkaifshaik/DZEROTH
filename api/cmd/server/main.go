@@ -27,6 +27,8 @@ func main() {
 
 	defer databasePool.Close()
 
+	fmt.Println(">>> RUNNING UPDATED DZEROTH API <<<")
+
 	router := httpapi.NewRouter(databasePool)
 
 	port := os.Getenv("PORT")
