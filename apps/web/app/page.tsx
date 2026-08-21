@@ -1,8 +1,14 @@
 "use client";
 
+// =====================================================
+// IMPORTS
+// =====================================================
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+
 import { request } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 import {
   addReaction,
@@ -11,7 +17,6 @@ import {
   createPost,
   getComments,
   getInnerCircleFeed,
-  getMe,
   getDiscoveryFeed,
   getInterests,
   getMyReactions,
@@ -19,7 +24,10 @@ import {
   getMyInterests,
   removeInterest,
 } from "../lib/api";
-import { supabase } from "@/lib/supabase";
+
+// =====================================================
+// TYPES
+// =====================================================
 
 type User = {
   id: string;
@@ -59,19 +67,51 @@ type Comment = {
 
 type ReactionType = "like" | "support" | "helpful";
 
+// =====================================================
+// MAIN COMPONENT
+// =====================================================
+
 export default function Home() {
   const router = useRouter();
+
+  // ===================================================
+  // USER & AUTH STATE
+  // ===================================================
+
   const [user, setUser] = useState<User | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [postText, setPostText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
+
+  // ===================================================
+  // SPACE & FEED STATE
+  // ===================================================
+
+  const [space, setSpace] = useState<"inner_circle" | "discovery">(
+    "inner_circle",
+  );
+
+  const [posts, setPosts] = useState<Post[]>([]);
+
+  // ===================================================
+  // POST CREATION STATE
+  // ===================================================
+
+  const [postText, setPostText] = useState("");
+  const [posting, setPosting] = useState(false);
+
+  // ===================================================
+  // COMMENTS STATE
+  // ===================================================
+
   const [openComments, setOpenComments] = useState<string | null>(null);
 
   const [comments, setComments] = useState<Record<string, Comment[]>>({});
 
   const [commentText, setCommentText] = useState("");
+
+  // ===================================================
+  // REACTIONS STATE
+  // ===================================================
 
   const [reactionMenu, setReactionMenu] = useState<string | null>(null);
 
@@ -79,9 +119,9 @@ export default function Home() {
     Record<string, ReactionType[]>
   >({});
 
-  const [space, setSpace] = useState<"inner_circle" | "discovery">(
-    "inner_circle",
-  );
+  // ===================================================
+  // INTERESTS STATE
+  // ===================================================
 
   const [interests, setInterests] = useState<Interest[]>([]);
 
@@ -90,6 +130,24 @@ export default function Home() {
   const [showInterestPicker, setShowInterestPicker] = useState(false);
 
   const [loadingInterests, setLoadingInterests] = useState(false);
+
+  // ===================================================
+  // PROFILE EDITOR STATE
+  // ===================================================
+
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
+
+  const [editDisplayName, setEditDisplayName] = useState("");
+
+  const [editBio, setEditBio] = useState("");
+
+  const [editAvatarURL, setEditAvatarURL] = useState("");
+
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  // ===================================================
+  // AUTH & INITIAL PAGE LOADING
+  // ===================================================
 
   useEffect(() => {
     async function checkSupabaseUser() {
@@ -120,6 +178,10 @@ export default function Home() {
         request("/api/v1/feeds/inner-circle"),
       ]);
 
+      // Save authenticated user's profile
+      setUser(profileData);
+
+      // Save posts for the default Inner Circle feed
       setPosts(feedData.posts || []);
     } catch (error) {
       console.error("Failed to load page data:", error);
@@ -138,6 +200,56 @@ export default function Home() {
 
     router.push("/login");
   }
+
+  // ===================================================
+  // PROFILE FUNCTIONS
+  // ===================================================
+
+  function openProfileEditor() {
+    if (!user) {
+      return;
+    }
+
+    setEditDisplayName(user.display_name);
+    setEditBio(user.bio);
+    setEditAvatarURL(user.avatar_url);
+
+    setShowProfileEditor(true);
+  }
+
+  async function handleProfileUpdate(
+    displayName: string,
+    bio: string,
+    avatarURL: string,
+  ) {
+    try {
+      setSavingProfile(true);
+      setError("");
+
+      const updatedUser = await request("/api/v1/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          display_name: displayName,
+          bio: bio,
+          avatar_url: avatarURL,
+        }),
+      });
+
+      setUser(updatedUser);
+
+      setShowProfileEditor(false);
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+
+      setError("Could not update your profile.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  // ===================================================
+  // POST FUNCTIONS
+  // ===================================================
 
   async function handleCreatePost(event: SubmitEvent) {
     event.preventDefault();
@@ -158,6 +270,7 @@ export default function Home() {
         space === "discovery" ? myInterestIds : [],
       );
 
+      // Add the new post to the top of the feed
       setPosts((currentPosts) => [
         {
           ...newPost,
@@ -171,11 +284,16 @@ export default function Home() {
       setPostText("");
     } catch (err) {
       console.error(err);
+
       setError("Could not publish your post.");
     } finally {
       setPosting(false);
     }
   }
+
+  // ===================================================
+  // COMMENT FUNCTIONS
+  // ===================================================
 
   async function toggleComments(postId: string) {
     if (openComments === postId) {
@@ -194,6 +312,7 @@ export default function Home() {
       setOpenComments(postId);
     } catch (err) {
       console.error(err);
+
       setError("Could not load comments.");
     }
   }
@@ -208,6 +327,7 @@ export default function Home() {
     try {
       const newComment = await createComment(postId, content);
 
+      // Add the new comment without reloading
       setComments((current) => ({
         ...current,
         [postId]: [...(current[postId] || []), newComment],
@@ -216,9 +336,14 @@ export default function Home() {
       setCommentText("");
     } catch (err) {
       console.error(err);
+
       setError("Could not add comment.");
     }
   }
+
+  // ===================================================
+  // REACTION FUNCTIONS
+  // ===================================================
 
   async function loadMyReactions(postId: string) {
     try {
@@ -258,6 +383,7 @@ export default function Home() {
       }
     } catch (err) {
       console.error(err);
+
       setError("Could not update reaction.");
     }
 
@@ -275,13 +401,9 @@ export default function Home() {
     setReactionMenu(postId);
   }
 
-  if (loading) {
-    return (
-      <main className="page">
-        <div className="loading">Loading your space...</div>
-      </main>
-    );
-  }
+  // ===================================================
+  // INTEREST FUNCTIONS
+  // ===================================================
 
   async function loadInterests() {
     try {
@@ -299,11 +421,46 @@ export default function Home() {
       );
     } catch (err) {
       console.error(err);
+
       setError("Could not load your interests.");
     } finally {
       setLoadingInterests(false);
     }
   }
+
+  async function toggleInterest(interestId: string) {
+    const selected = myInterestIds.includes(interestId);
+
+    try {
+      if (selected) {
+        await removeInterest(interestId);
+
+        setMyInterestIds((current) =>
+          current.filter((id) => id !== interestId),
+        );
+      } else {
+        await addInterest(interestId);
+
+        setMyInterestIds((current) => [...current, interestId]);
+      }
+
+      // Refresh Discovery feed after
+      // changing interests
+      if (space === "discovery") {
+        const feed = await getDiscoveryFeed();
+
+        setPosts(feed.posts);
+      }
+    } catch (err) {
+      console.error(err);
+
+      setError("Could not update interests.");
+    }
+  }
+
+  // ===================================================
+  // SPACE NAVIGATION
+  // ===================================================
 
   async function switchSpace(nextSpace: "inner_circle" | "discovery") {
     if (nextSpace === space) {
@@ -327,43 +484,36 @@ export default function Home() {
       setSpace(nextSpace);
     } catch (err) {
       console.error(err);
+
       setError("Unable to load this space.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function toggleInterest(interestId: string) {
-    const selected = myInterestIds.includes(interestId);
+  // ===================================================
+  // LOADING SCREEN
+  // ===================================================
 
-    try {
-      if (selected) {
-        await removeInterest(interestId);
-
-        setMyInterestIds((current) =>
-          current.filter((id) => id !== interestId),
-        );
-      } else {
-        await addInterest(interestId);
-
-        setMyInterestIds((current) => [...current, interestId]);
-      }
-
-      if (space === "discovery") {
-        const feed = await getDiscoveryFeed();
-
-        setPosts(feed.posts);
-      }
-    } catch (err) {
-      console.error(err);
-
-      setError("Could not update interests.");
-    }
+  if (loading) {
+    return (
+      <main className="page">
+        <div className="loading">Loading your space...</div>
+      </main>
+    );
   }
+
+  // ===================================================
+  // PAGE UI
+  // ===================================================
 
   return (
     <main className="page">
+      {/* =============================================
+          HEADER
+      ============================================== */}
       <header className="topbar">
+        {/* Keep your existing header JSX here */}
         <div className="brand">
           <div className="brand-mark">R</div>
 
@@ -374,16 +524,23 @@ export default function Home() {
         </div>
 
         {user && (
-          <div className="profile">
+          <button type="button" className="profile" onClick={openProfileEditor}>
             <div className="profile-avatar">{user.display_name.charAt(0)}</div>
 
             <span>{user.display_name}</span>
-          </div>
+          </button>
         )}
       </header>
 
+      {/* =============================================
+          MAIN LAYOUT
+      ============================================== */}
       <div className="layout">
+        {/* ===========================================
+            SIDEBAR & NAVIGATION
+        ============================================ */}
         <aside className="sidebar">
+          {/* Keep your existing sidebar JSX here */}
           <nav>
             <button
               className={
@@ -418,7 +575,11 @@ export default function Home() {
           </div>
         </aside>
 
+        {/* ===========================================
+            FEED
+        ============================================ */}
         <section className="feed">
+          {/* Feed heading */}
           <div className="feed-heading">
             <div>
               <p className="eyebrow">
@@ -442,6 +603,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* Discovery controls */}
           {space === "discovery" && (
             <div className="discovery-controls">
               <button
@@ -468,6 +630,7 @@ export default function Home() {
             </div>
           )}
 
+          {/* Post composer */}
           <form
             className="composer"
             onSubmit={async (event) => {
@@ -503,8 +666,10 @@ export default function Home() {
             </div>
           </form>
 
+          {/* Error message */}
           {error && <div className="error">{error}</div>}
 
+          {/* Posts */}
           <div className="posts">
             {posts.map((post) => (
               <article className="post" key={post.id}>
@@ -658,10 +823,16 @@ export default function Home() {
               )}
             </div>
           )}
+
+          {/* Empty state */}
         </section>
       </div>
 
+      {/* =============================================
+          INTEREST PICKER MODAL
+      ============================================== */}
       {showInterestPicker && (
+        // Keep your existing modal JSX here
         <div className="interest-overlay">
           <div className="interest-modal">
             <div className="interest-modal-header">
@@ -717,10 +888,6 @@ export default function Home() {
               className="interest-done"
               onClick={() => {
                 setShowInterestPicker(false);
-
-                // if (space === "discovery") {
-                //   switchSpace("discovery");
-                // }
               }}
             >
               Done
@@ -728,9 +895,77 @@ export default function Home() {
           </div>
         </div>
       )}
+      {showProfileEditor && user && (
+        <div className="interest-overlay">
+          <div className="interest-modal">
+            <div className="interest-modal-header">
+              <div>
+                <p className="eyebrow">YOUR PROFILE</p>
+
+                <h2>Edit profile</h2>
+
+                <p>Update how people see you on RealSpace.</p>
+              </div>
+
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setShowProfileEditor(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="profile-editor">
+              <label>
+                Display name
+                <input
+                  value={editDisplayName}
+                  onChange={(event) => setEditDisplayName(event.target.value)}
+                  maxLength={100}
+                />
+              </label>
+
+              <label>
+                Bio
+                <textarea
+                  value={editBio}
+                  onChange={(event) => setEditBio(event.target.value)}
+                  maxLength={500}
+                  rows={4}
+                />
+              </label>
+
+              <label>
+                Avatar URL
+                <input
+                  value={editAvatarURL}
+                  onChange={(event) => setEditAvatarURL(event.target.value)}
+                  placeholder="https://example.com/avatar.jpg"
+                />
+              </label>
+
+              <button
+                type="button"
+                className="interest-done"
+                onClick={() => {
+                  handleProfileUpdate(editDisplayName, editBio, editAvatarURL);
+                }}
+                disabled={savingProfile}
+              >
+                {savingProfile ? "Saving..." : "Save profile"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
+
+// =====================================================
+// UTILITY FUNCTIONS
+// =====================================================
 
 function formatDate(date: string) {
   const value = new Date(date);

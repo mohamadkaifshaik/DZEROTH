@@ -36,7 +36,22 @@ func NewRouter(databasePool *pgxpool.Pool) http.Handler {
 
 	mux.HandleFunc(
 		"/api/v1/me",
-		userHandler.GetMe,
+		func(w http.ResponseWriter, r *http.Request) {
+			switch r.Method {
+			case http.MethodGet:
+				userHandler.GetMe(w, r)
+
+			case http.MethodPatch:
+				userHandler.UpdateMe(w, r)
+
+			default:
+				http.Error(
+					w,
+					"method not allowed",
+					http.StatusMethodNotAllowed,
+				)
+			}
+		},
 	)
 
 	// Inner Circle
