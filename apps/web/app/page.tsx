@@ -429,32 +429,33 @@ export default function Home() {
   }
 
   async function toggleInterest(interestId: string) {
-    const selected = myInterestIds.includes(interestId);
+    const isSelected = myInterestIds.includes(interestId);
 
     try {
-      if (selected) {
+      setError("");
+
+      if (isSelected) {
         await removeInterest(interestId);
 
-        setMyInterestIds((current) =>
-          current.filter((id) => id !== interestId),
+        setMyInterestIds((currentIds) =>
+          currentIds.filter((id) => id !== interestId),
         );
       } else {
         await addInterest(interestId);
 
-        setMyInterestIds((current) => [...current, interestId]);
+        setMyInterestIds((currentIds) => [...currentIds, interestId]);
       }
 
-      // Refresh Discovery feed after
-      // changing interests
+      // Refresh the Discovery feed immediately
       if (space === "discovery") {
         const feed = await getDiscoveryFeed();
 
-        setPosts(feed.posts);
+        setPosts(feed.posts || []);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error("Failed to update interests:", error);
 
-      setError("Could not update interests.");
+      setError("Could not update your interests.");
     }
   }
 
@@ -815,10 +816,11 @@ export default function Home() {
 
               {space === "discovery" && myInterestIds.length === 0 && (
                 <button
-                  className="interest-done"
+                  type="button"
+                  className="interest-button"
                   onClick={() => setShowInterestPicker(true)}
                 >
-                  Choose interests
+                  Manage interests
                 </button>
               )}
             </div>
@@ -829,69 +831,68 @@ export default function Home() {
       </div>
 
       {/* =============================================
-          INTEREST PICKER MODAL
-      ============================================== */}
+          INTEREST PICKER
+      ============================================= */}
+
       {showInterestPicker && (
-        // Keep your existing modal JSX here
-        <div className="interest-overlay">
-          <div className="interest-modal">
+        <div
+          className="modal-backdrop"
+          onClick={() => setShowInterestPicker(false)}
+        >
+          <div
+            className="interest-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="interest-modal-header">
               <div>
-                <p className="eyebrow">YOUR DISCOVERY</p>
+                <h2>Your interests</h2>
 
-                <h2>Choose your interests</h2>
-
-                <p>You decide what belongs in your Discovery space.</p>
+                <p>Choose topics you want to see in Discovery.</p>
               </div>
 
               <button
-                className="modal-close"
+                type="button"
                 onClick={() => setShowInterestPicker(false)}
+                aria-label="Close interests"
               >
                 ×
               </button>
             </div>
 
-            <div className="interest-grid">
-              {loadingInterests ? (
-                <div className="loading">Loading interests...</div>
-              ) : (
-                interests.map((interest) => {
+            {loadingInterests ? (
+              <p>Loading interests...</p>
+            ) : (
+              <div className="interest-list">
+                {interests.map((interest) => {
                   const selected = myInterestIds.includes(interest.id);
 
                   return (
                     <button
                       key={interest.id}
+                      type="button"
                       className={
-                        selected
-                          ? "interest-option selected"
-                          : "interest-option"
+                        selected ? "interest-item selected" : "interest-item"
                       }
                       onClick={() => toggleInterest(interest.id)}
                     >
-                      <div>
-                        <strong>{interest.name}</strong>
+                      <span>{interest.name}</span>
 
-                        <span>{interest.description}</span>
-                      </div>
-
-                      <div className="interest-check">
-                        {selected ? "✓" : "+"}
-                      </div>
+                      {selected && <span>✓</span>}
                     </button>
                   );
-                })
-              )}
-            </div>
+                })}
+              </div>
+            )}
 
-            <button
-              className="interest-done"
-              onClick={() => {
-                setShowInterestPicker(false);
-              }}
-            >
-              Done
-            </button>
+            <div className="interest-modal-footer">
+              <button
+                type="button"
+                className="interest-done"
+                onClick={() => setShowInterestPicker(false)}
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
