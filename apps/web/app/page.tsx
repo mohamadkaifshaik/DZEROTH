@@ -146,6 +146,12 @@ export default function Home() {
   const [savingProfile, setSavingProfile] = useState(false);
 
   // ===================================================
+  // DERIVED STATE
+  // ===================================================
+
+  const hasInterests = myInterestIds.length > 0;
+
+  // ===================================================
   // AUTH & INITIAL PAGE LOADING
   // ===================================================
 
@@ -814,14 +820,137 @@ export default function Home() {
                     : "You've seen everything matching your interests for now."}
               </p>
 
-              {space === "discovery" && myInterestIds.length === 0 && (
-                <button
-                  type="button"
-                  className="interest-button"
-                  onClick={() => setShowInterestPicker(true)}
-                >
-                  Manage interests
-                </button>
+              {space === "discovery" && !hasInterests ? (
+                <div className="empty-state">
+                  <h2>Choose your interests</h2>
+
+                  <p>
+                    Select topics you care about to discover posts and people
+                    relevant to you.
+                  </p>
+
+                  <button
+                    type="button"
+                    className="interest-done"
+                    onClick={() => setShowInterestPicker(true)}
+                  >
+                    Choose interests
+                  </button>
+                </div>
+              ) : posts.length === 0 ? (
+                <div className="empty-state">
+                  <h2>No posts yet</h2>
+
+                  <p>There are no posts to show right now. Check back later.</p>
+                </div>
+              ) : (
+                posts.map((post) => (
+                  // Keep your existing post rendering here
+                  <article className="post" key={post.id}>
+                    <div className="post-header">
+                      <div className="post-avatar">
+                        {post.display_name.charAt(0)}
+                      </div>
+
+                      <div className="post-author">
+                        <strong>{post.display_name}</strong>
+
+                        <span>@{post.username}</span>
+                      </div>
+
+                      <time>{formatDate(post.created_at)}</time>
+                    </div>
+
+                    <p className="post-content">{post.content}</p>
+
+                    <div className="post-footer">
+                      <button onClick={() => toggleComments(post.id)}>
+                        {openComments === post.id ? "Hide comments" : "Comment"}
+                      </button>
+
+                      <button onClick={() => toggleReactionMenu(post.id)}>
+                        React
+                      </button>
+                    </div>
+
+                    {openComments === post.id && (
+                      <div className="comments">
+                        <div className="comment-list">
+                          {(comments[post.id] || []).map((comment) => (
+                            <div className="comment" key={comment.id}>
+                              <div className="comment-avatar">
+                                {comment.display_name.charAt(0)}
+                              </div>
+
+                              <div>
+                                <strong>{comment.display_name}</strong>
+
+                                <p>{comment.content}</p>
+                              </div>
+                            </div>
+                          ))}
+
+                          {comments[post.id]?.length === 0 && (
+                            <p className="no-comments">
+                              Be the first to say something.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="comment-composer">
+                          <input
+                            value={commentText}
+                            onChange={(event) =>
+                              setCommentText(event.target.value)
+                            }
+                            placeholder="Write a thoughtful comment..."
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && !event.shiftKey) {
+                                event.preventDefault();
+
+                                handleCreateComment(post.id);
+                              }
+                            }}
+                          />
+
+                          <button
+                            onClick={() => handleCreateComment(post.id)}
+                            disabled={!commentText.trim()}
+                          >
+                            Send
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {reactionMenu === post.id && (
+                      <div className="reaction-menu">
+                        {(
+                          [
+                            ["like", "Like"],
+                            ["support", "Support"],
+                            ["helpful", "Helpful"],
+                          ] as [ReactionType, string][]
+                        ).map(([type, label]) => {
+                          const selected = myReactions[post.id]?.includes(type);
+
+                          return (
+                            <button
+                              key={type}
+                              className={
+                                selected ? "reaction selected" : "reaction"
+                              }
+                              onClick={() => handleReaction(post.id, type)}
+                            >
+                              {label}
+                              {selected && " ✓"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </article>
+                ))
               )}
             </div>
           )}
