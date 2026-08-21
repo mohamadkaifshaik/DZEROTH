@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { request } from "@/lib/api";
 
 import {
   addReaction,
@@ -58,6 +60,7 @@ type Comment = {
 type ReactionType = "like" | "support" | "helpful";
 
 export default function Home() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postText, setPostText] = useState("");
@@ -102,20 +105,24 @@ export default function Home() {
   }, []);
 
   async function loadPage() {
-    try {
-      setLoading(true);
-      setError("");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-      const [userData, feedData] = await Promise.all([
-        getMe(),
-        getInnerCircleFeed(),
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+
+    try {
+      const [profileData, feedData] = await Promise.all([
+        request("/api/v1/me"),
+        request("/api/v1/feeds/inner-circle"),
       ]);
 
-      setUser(userData);
-      setPosts(feedData.posts);
-    } catch (err) {
-      console.error(err);
-      setError("Unable to load your space.");
+      setPosts(feedData.posts || []);
+    } catch (error) {
+      console.error("Failed to load page data:", error);
     } finally {
       setLoading(false);
     }
@@ -125,6 +132,12 @@ export default function Home() {
     loadPage();
     loadInterests();
   }, []);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+
+    router.push("/login");
+  }
 
   async function handleCreatePost(event: SubmitEvent) {
     event.preventDefault();
@@ -389,6 +402,7 @@ export default function Home() {
               <span>✦</span>
               Discovery
             </button>
+            <button onClick={handleLogout}>Logout</button>
           </nav>
 
           <div className="sidebar-note">

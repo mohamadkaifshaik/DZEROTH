@@ -2,7 +2,7 @@ import { supabase } from "./supabase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
-async function request(path: string, options: RequestInit = {}) {
+export async function request(path: string, options: RequestInit = {}) {
   const {
     data: { session },
   } = await supabase.auth.getSession();
